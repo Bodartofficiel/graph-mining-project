@@ -1,4 +1,3 @@
-from node2vec import Node2Vec
 from get_graphs import deezer_graph, lastfm_graph
 import numpy as np
 import networkx as nx 
@@ -14,11 +13,6 @@ percent_nodes = 0.2
 n_nodes = int(lastfm_graph.number_of_nodes() * percent_nodes)
 print(f"Selected nodes: {n_nodes} ({percent_nodes*100:.0f}%)")
 
-# Random sampling 
-# np.random.seed = 42
-# random_nodes = [node for node in np.random.choice(lastfm_graph.nodes,size=n_nodes,replace=False)] 
-# subgraph = lastfm_graph.subgraph(random_nodes)
-
 # Random walk sampling
 def random_walk_sampling(graph, start_node, walk_len, damping_factor=0.15):
     visited = {start_node}
@@ -32,7 +26,7 @@ def random_walk_sampling(graph, start_node, walk_len, damping_factor=0.15):
             current_node = np.random.choice(graph.nodes)
     return(visited)
 
-random_nodes = random_walk_sampling(lastfm_graph,np.random.choice(lastfm_graph.nodes),n_nodes)
+random_nodes = random_walk_sampling(lastfm_graph,start_node=np.random.choice(lastfm_graph.nodes),walk_len=n_nodes)
 subgraph = lastfm_graph.subgraph(random_nodes)
 print("Subgraph created!")
 
@@ -40,23 +34,23 @@ print("Subgraph created!")
 A = nx.adjacency_matrix(subgraph).toarray()
 D = np.diag(A.sum(axis=1)) 
 
-# Avoid division by zero
+# Pour éviter une division par 0
 epsilon = 1e-6
 D_inv_sqrt = np.diag(1.0 / np.sqrt(D.diagonal() + epsilon))
 I = np.identity(len(D))
 
-# Normalized Laplacian
+# Laplacian normalisé
 L = I - D_inv_sqrt @ A @ D_inv_sqrt
 
 # Laplacian
 # L = D - A
 
-# find eigenvalues and eigenvectors 
-tolerance = 1e-14
+# Valeurs et vecteurs propres
 vals, vecs = np.linalg.eig(L)
+
+tolerance = 1e-14
 vals = np.real(vals)
 vals[np.abs(vals) < tolerance] = 0
-
 vecs = np.real(vecs)
 vecs[np.abs(vecs) < tolerance] = 0
 
