@@ -19,6 +19,8 @@ lastfm_edges_path = lastfm_data_path / "lastfm_asia_edges.csv"
 deezer_edges_path = deezer_data_path / "deezer_europe_edges.csv"
 lastfm_nattr_path = lastfm_data_path / "lastfm_asia_features.json"
 deezer_nattr_path = deezer_data_path / "deezer_europe_features.json"
+lastfm_target_path = lastfm_data_path / "lastfm_asia_target.csv"
+deezer_target_path = deezer_data_path / "deezer_europe_target.csv"
 
 assert os.path.exists(
     deezer_edges_path
@@ -55,3 +57,15 @@ for node_idx, node_features in deezer_node_attributes.items():
 
 for node_idx, node_features in lastfm_node_attributes.items():
     lastfm_graph.nodes[int(node_idx)]["feat"] = node_features
+
+with open(deezer_target_path, "r") as file:
+    next(file)
+    for line in file:
+        id, target = line.strip().split(",")
+        deezer_graph.nodes[int(id)]["target"] = int(target)
+
+with open(lastfm_target_path, "r") as file:
+    next(file)
+    for line in file:
+        id, target = line.strip().split(",")
+        lastfm_graph.nodes[int(id)]["target"] = int(target)
