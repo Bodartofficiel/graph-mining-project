@@ -1,9 +1,10 @@
 import json
 import os
 from pathlib import Path
-import torch
-import torch.nn as nn
+
 import networkx as nx
+import torch
+from torch_geometric.utils.convert import from_networkx
 
 file_dir = Path(__file__).parent
 lastfm_data_path = file_dir.parent / "lastfm_asia"
@@ -68,9 +69,29 @@ with open(deezer_nattr_path, "r") as f:
 with open(lastfm_nattr_path, "r") as f:
     lastfm_node_attributes = json.load(f)
 
+
 # Get max of values of edge features
-max_deezer_features = max([max(features) for features in deezer_node_attributes.values() if len(features) > 0])+1
-max_lastfm_features = max([max(features) for features in lastfm_node_attributes.values() if len(features) > 0])+1
+max_deezer_features = (
+    max(
+        [
+            max(features)
+            for features in deezer_node_attributes.values()
+            if len(features) > 0
+        ]
+    )
+    + 1
+)
+max_lastfm_features = (
+    max(
+        [
+            max(features)
+            for features in lastfm_node_attributes.values()
+            if len(features) > 0
+        ]
+    )
+    + 1
+)
+
 
 # print(max_deezer_features)
 # print(max_lastfm_features)
@@ -79,38 +100,52 @@ max_lastfm_features = max([max(features) for features in lastfm_node_attributes.
 deezer_max_len = max([len(features) for features in deezer_node_attributes.values()])
 lastfm_max_len = max([len(features) for features in lastfm_node_attributes.values()])
 
+for node, feature in deezer_node_attributes.items():
+    deezer_graph.nodes[int(node)]["x"] = torch.tensor(
+        feature + [max_deezer_features] * (deezer_max_len - len(feature))
+    )
+
+for node, feature in lastfm_node_attributes.items():
+    lastfm_graph.nodes[int(node)]["x"] = torch.tensor(
+        feature + [max_lastfm_features] * (lastfm_max_len - len(feature))
+    )
+
 # print(deezer_max_len)
 # print(lastfm_max_len)
 
-class EmbeddingModel(nn.Module):
-    def __init__(self, num_songs, embedding_dim):
-        super(EmbeddingModel, self).__init__()
-        self.embedding = nn.Embedding(num_embeddings=num_songs, embedding_dim=embedding_dim)
 
-    def forward(self, x):
-        return self.embedding(x)
-    
-embedding_dim = 50
-deezer_embedding_model = EmbeddingModel(max_deezer_features, embedding_dim)
-lastfm_embedding_model = EmbeddingModel(max_lastfm_features, embedding_dim)
-
-for node_idx, node_features in deezer_node_attributes.items():
-    node_padded_features = node_features + [0] * (deezer_max_len - len(node_features))
-    padded_vector = torch.LongTensor(node_padded_features)
-    with torch.no_grad():
-        try:
-            embeddings = deezer_embedding_model(padded_vector)
-        except :
-            print(node_idx, padded_vector, max(padded_vector), len(padded_vector))
-            os._exit()
-    deezer_graph.nodes[int(node_idx)]["feat"] = embeddings
-
-for node_idx, node_features in lastfm_node_attributes.items():
-    node_padded_features = node_features + [0] * (deezer_max_len - len(node_features))
-    padded_vector = torch.LongTensor(node_padded_features)
-    with torch.no_grad():
-        embeddings = lastfm_embedding_model(padded_vector)
-    deezer_graph.nodes[int(node_idx)]["feat"] = embeddings
+# class EmbeddingModel(nn.Module):
+#     def __init__(self, num_songs, embedding_dim):
+#         super(EmbeddingModel, self).__init__()
+#         self.embedding = nn.Embedding(
+#             num_embeddings=num_songs, embedding_dim=embedding_dim
+#         )
+#
+#     def forward(self, x):
+#         return self.embedding(x)
+#
+#
+# embedding_dim = 50
+# deezer_embedding_model = EmbeddingModel(max_deezer_features, embedding_dim)
+# lastfm_embedding_model = EmbeddingModel(max_lastfm_features, embedding_dim)
+#
+# for node_idx, node_features in deezer_node_attributes.items():
+#     node_padded_features = node_features + [0] * (deezer_max_len - len(node_features))
+#     padded_vector = torch.LongTensor(node_padded_features)
+#     with torch.no_grad():
+#         try:
+#             embeddings = deezer_embedding_model(padded_vector)
+#         except:
+#             print(node_idx, padded_vector, torch.max(padded_vector), len(padded_vector))
+#             os._exit(0)
+#     deezer_graph.nodes[int(node_idx)]["feat"] = embeddings
+#
+# for node_idx, node_features in lastfm_node_attributes.items():
+#     node_padded_features = node_features + [0] * (deezer_max_len - len(node_features))
+#     padded_vector = torch.LongTensor(node_padded_features)
+#     with torch.no_grad():
+#         embeddings = lastfm_embedding_model(padded_vector)
+#     deezer_graph.nodes[int(node_idx)]["feat"] = embeddings
 
 
 ### Target
@@ -128,7 +163,13 @@ deezer_targets = read_targets(deezer_targt_path)
 lastfm_targets = read_targets(lastfm_targt_path)
 
 for node_idx, target in deezer_targets.items():
-    deezer_graph.nodes[node_idx]["target"] = target
+    deezer_graph.nodes[node_idx]["y"] = target
 
 for node_idx, target in lastfm_targets.items():
-    lastfm_graph.nodes[node_idx]["target"] = target
+    lastfm_graph.nodes[node_idx]["y"] = target
+
+max_lastfm_target = max(lastfm_targets.values())
+print(f"Max target in LastFM: {max_lastfm_target}")
+
+deezer_pyg = from_networkx(deezer_graph)
+lastfm_pyg = from_networkx(lastfm_graph)
